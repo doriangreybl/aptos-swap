@@ -1,0 +1,19 @@
+{
+  "name": "aptospancakeswap",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "ts-node src/script.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aptos": "^1.15.0",
+    "axios": "^1.4.0",
+    "ethers": "^5.7.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.6"
+  }
+}
