@@ -1,4 +1,5 @@
 import axios, { AxiosResponse } from "axios";
+import { TG_CHAT_ID, TG_TOKEN } from "../DEPENDENCIES";
 
 
 type TimeSeparated = {
@@ -103,4 +104,29 @@ export function shuffleArray<T>(array: T[]) {
     [array[i], array[j]] = [array[j], array[i]];
   }
   return array;
+}
+
+export async function sendTelegramMessage(message: string) {
+
+  if (TG_CHAT_ID === 0 || TG_TOKEN === 0) {
+    return;
+  }
+
+  // Escape markdown special characters
+  const escapedMessage = message.replace(/([*_[\]()~`>#+\-={}.!])/g, '\\$1');
+
+  // Truncate the message if it's too long
+  const maxLength = 4096;
+  const truncatedMessage = escapedMessage.slice(0, maxLength);
+
+  try {
+    await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      chat_id: TG_CHAT_ID,
+      text: truncatedMessage,
+      parse_mode: 'MarkdownV2',  // Or 'HTML' if you're using HTML tags
+      disable_web_page_preview: true,
+    });
+  } catch (error) {
+    console.log(error);
+  }
 }

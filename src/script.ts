@@ -1,12 +1,12 @@
 import { DECIMALS, Data } from "./AptosConstants";
-import { shuffleArray } from "./Helpers";
+import { shuffleArray, sendTelegramMessage, sleep } from "./Helpers";
 import { pancakeAptosSwapTokens } from "./PancakeAptosService";
 import { getAptosBalance, getAddress } from "./AptosHelpers";
+import { MAX_TRANSACTIONS_PER_WALLET, MIN_APTOS_BALANCE, MIN_WAIT_TIME, MAX_WAIT_TIME } from "../DEPENDENCIES";
 import fs from 'fs';
 
 
 let data: Record<string, Data> = {};
-const MAX_TRANSACTIONS_PER_WALLET = 5;
 
 async function main() {
 
@@ -31,6 +31,7 @@ async function main() {
     // check if max transactions reached
     if (data[address].transactions && data[address].transactions! >= MAX_TRANSACTIONS_PER_WALLET) {
       console.log('Max transactions reached for address: ' + address);
+      await sendTelegramMessage(`🏁 Max transactions reached for address: ${address}, removing from list`);
 
       pkArr.splice(pkArr.indexOf(pk), 1);
 
@@ -43,8 +44,10 @@ async function main() {
     }
 
     // check if balance is too low
-    if (balances['AptosCoin'] <  0.002) {
+    if (balances['AptosCoin'] <  MIN_APTOS_BALANCE) {
       console.log('AptosCoin balance is too low for address: ' + address);
+      await sendTelegramMessage(`🛑 APT balance is too low for address: ${address}, removing from list, current balance: ${balances['AptosCoin']}`);
+
       pkArr.splice(pkArr.indexOf(pk), 1);
 
       data[address] = {
@@ -91,6 +94,10 @@ async function main() {
 
     console.log(`Successfully swapped ${amountToSwap} ${tokenFromName} to ${tokenToName} for address: ${address}, tx: ${swap.txHash}`);
 
+    await sendTelegramMessage(
+      `✅ Successfully swapped ${swap.totalVolume}$ of ${tokenFromName} to ${tokenToName} for address: ${address}, tx: https://explorer.aptoslabs.com/txn/${swap.txHash}`
+    );
+
     data[address] = {
       address,
       transactions: data[address].transactions ? data[address].transactions! + 1 : 1,
@@ -98,6 +105,7 @@ async function main() {
       balances,
     }
 
+    await sleep({ minutes: MIN_WAIT_TIME }, { minutes: MAX_WAIT_TIME });
   }
 }
 
