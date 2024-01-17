@@ -108,7 +108,7 @@ export function shuffleArray<T>(array: T[]) {
 
 export async function sendTelegramMessage(message: string) {
 
-  if (TG_CHAT_ID === 0 || TG_TOKEN === 0) {
+  if (TG_CHAT_ID === 0 || TG_TOKEN === '') {
     return;
   }
 

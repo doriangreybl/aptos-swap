@@ -10,4 +10,4 @@ export const MAX_WAIT_TIME = 10; // MINUTES
 
 export const TG_CHAT_ID = 0; // Telegram chat id
 
-export const TG_TOKEN = 0; // Telegram bot token
+export const TG_TOKEN = ''; // Telegram bot token
