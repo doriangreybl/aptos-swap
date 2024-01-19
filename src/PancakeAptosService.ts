@@ -58,7 +58,7 @@ export async function pancakeAptosSwapTokens(
     ],
     arguments: [
       amountInWei,
-      amountOut.mul(99).div(100), // min_amount_out
+      amountOut.mul(99).div(100).toString(), // min_amount_out
     ],
     type: 'entry_function_payload',
   };
@@ -71,7 +71,7 @@ export async function pancakeAptosSwapTokens(
     payload,
     {
       gas_unit_price: gasPrice.prioritized_gas_estimate!.toString(),
-      max_gas_amount: '100',
+      max_gas_amount: '1000',
       sequence_number: nonce.toString(),
     }
   ));
@@ -81,7 +81,7 @@ export async function pancakeAptosSwapTokens(
   await retry(() => client.waitForTransaction(sendTx.hash));
 
   return {
-    result: false,
+    result: true,
     name: `Swap ${tokenFromName} to ${tokenToName} on Aptos PancakeSwap`,
     txHash: sendTx.hash,
     totalVolume,

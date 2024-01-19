@@ -20,25 +20,24 @@ async function main() {
 
     if (pkArr.length === 0) {
       console.log('No more private keys to use');
+      await sendTelegramMessage(`🏁 NO MORE KEYS TO USE LEFT, SCRIPT IS FINISHED`);
       fs.writeFileSync('walletsData.json', JSON.stringify(data, null, 2));
       return;
     }
 
     const pk = shuffleArray(pkArr)[0];
     const address = getAddress(pk);
+    console.log('Using address: ' + address + '\n');
     const balances = await getAptosBalance(pk);
 
     // check if max transactions reached
-    if (data[address].transactions && data[address].transactions! >= MAX_TRANSACTIONS_PER_WALLET) {
+    if (data[address] && data[address].transactions && data[address].transactions! >= MAX_TRANSACTIONS_PER_WALLET) {
       console.log('Max transactions reached for address: ' + address);
-      await sendTelegramMessage(`🏁 Max transactions reached for address: ${address}, removing from list`);
+      await sendTelegramMessage(`🗑 Max transactions reached for address: ${address}, removing from list`);
 
       pkArr.splice(pkArr.indexOf(pk), 1);
 
-      data[address] = {
-        address,
-        balances,
-      }
+      data[address].balances = balances;
 
       continue;
     }
@@ -68,12 +67,12 @@ async function main() {
     let amountToSwap: number;
     if (tokenFromName === 'AptosCoin') {
       const maxSwapAmount = balances[tokenFromName] - 0.0015;
-      const amountInWei = +maxSwapAmount.toFixed(6) * DECIMALS[tokenFromName];
+      const amountInWei = +maxSwapAmount.toFixed(6) * 10 ** DECIMALS[tokenFromName];
       // number between 5 and 60
       const random = Math.floor(Math.random() * (70 - 10 + 1) + 10);
       amountToSwap = Math.floor(amountInWei / 100 * random);
     } else {
-      const balanceInWei = +balances[tokenFromName].toFixed(6) * DECIMALS[tokenFromName];
+      const balanceInWei = +balances[tokenFromName].toFixed(6) * 10 ** DECIMALS[tokenFromName];
       // number between 5 and 100
       const random = Math.floor(Math.random() * (100 - 5 + 1) + 5);
       amountToSwap = Math.floor(balanceInWei / 100 * random);
@@ -92,16 +91,16 @@ async function main() {
       continue;
     }
 
-    console.log(`Successfully swapped ${amountToSwap} ${tokenFromName} to ${tokenToName} for address: ${address}, tx: ${swap.txHash}`);
+    console.log(`Successfully swapped ${(swap.totalVolume)?.toFixed(2)} $ ${tokenFromName} to ${tokenToName} for address: ${address}, tx: ${swap.txHash} \n`);
 
     await sendTelegramMessage(
-      `✅ Successfully swapped ${swap.totalVolume}$ of ${tokenFromName} to ${tokenToName} for address: ${address}, tx: https://explorer.aptoslabs.com/txn/${swap.txHash}`
+      `✅ Successfully swapped ${(swap.totalVolume)?.toFixed(2)} $ of ${tokenFromName} to ${tokenToName} for address: ${address}, tx: https://tracemove.io/transaction/${swap.txHash}`
     );
 
     data[address] = {
       address,
-      transactions: data[address].transactions ? data[address].transactions! + 1 : 1,
-      totalVolume: data[address].totalVolume ? data[address].totalVolume! + swap.totalVolume! : swap.totalVolume,
+      transactions: data[address]?.transactions ? data[address].transactions! + 1 : 1,
+      totalVolume: data[address]?.totalVolume ? data[address].totalVolume! + Number((swap.totalVolume)?.toFixed(2)) : Number((swap.totalVolume)?.toFixed(2)),
       balances,
     }
 
