@@ -10,7 +10,7 @@ let data: Record<string, Data> = {};
 
 async function main() {
 
-  const pkArr = fs.readFileSync('keys.txt').toString().split('\n');
+  const pkArr = fs.readFileSync('keys.txt').toString().replaceAll('\r', '').split('\n');
 
   if (fs.existsSync('walletsData.json')) {
     data = JSON.parse(fs.readFileSync('walletsData.json').toString());
