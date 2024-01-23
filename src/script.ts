@@ -2,7 +2,7 @@ import { DECIMALS, Data } from "./AptosConstants";
 import { shuffleArray, sendTelegramMessage, sleep } from "./Helpers";
 import { pancakeAptosSwapTokens } from "./PancakeAptosService";
 import { getAptosBalance, getAddress } from "./AptosHelpers";
-import { MAX_TRANSACTIONS_PER_WALLET, MIN_APTOS_BALANCE, MIN_WAIT_TIME, MAX_WAIT_TIME } from "../DEPENDENCIES";
+import { MAX_TRANSACTIONS_PER_WALLET, MIN_APTOS_BALANCE, MIN_WAIT_TIME, MAX_WAIT_TIME, MAX_SWAP_PERCENT, MIN_SWAP_PERCENT, MIN_AMOUNTS } from "../DEPENDENCIES";
 import fs from 'fs';
 
 
@@ -66,16 +66,29 @@ async function main() {
 
     let amountToSwap: number;
     if (tokenFromName === 'AptosCoin') {
-      const maxSwapAmount = balances[tokenFromName] - 0.0015;
+      const maxSwapAmount = balances[tokenFromName] - 0.002;
+
+      if (maxSwapAmount <= 0) {
+        console.log('AptosCoin balance is too low for address: ' + address);
+        continue;
+      }
+
       const amountInWei = +maxSwapAmount.toFixed(6) * 10 ** DECIMALS[tokenFromName];
-      // number between 5 and 60
-      const random = Math.floor(Math.random() * (70 - 10 + 1) + 10);
+
+      const random = Math.floor(Math.random() * (MAX_SWAP_PERCENT - MIN_SWAP_PERCENT + 1) + MIN_SWAP_PERCENT);
+
       amountToSwap = Math.floor(amountInWei / 100 * random);
     } else {
+
+      if (balances[tokenFromName] <= MIN_AMOUNTS[tokenFromName]) {
+        amountToSwap = +balances[tokenFromName].toFixed(6) * 10 ** DECIMALS[tokenFromName];
+      } else {
       const balanceInWei = +balances[tokenFromName].toFixed(6) * 10 ** DECIMALS[tokenFromName];
-      // number between 5 and 100
-      const random = Math.floor(Math.random() * (100 - 5 + 1) + 5);
+
+      const random = Math.floor(Math.random() * (MAX_SWAP_PERCENT - MIN_SWAP_PERCENT + 1) + MIN_SWAP_PERCENT);
+
       amountToSwap = Math.floor(balanceInWei / 100 * random);
+      }
     }
 
     const swap = await pancakeAptosSwapTokens(pk, tokenFromName, tokenToName, amountToSwap);
