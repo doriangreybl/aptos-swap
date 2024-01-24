@@ -1,6 +1,6 @@
 
 
-export const MAX_TRANSACTIONS_PER_WALLET = 10; // transactions per wallet
+export const MAX_TRANSACTIONS_PER_WALLET = 25; // transactions per wallet
 
 export const MIN_APTOS_BALANCE = 0.005; // 0.0025 APTOS balance ~ 0.02 $
 

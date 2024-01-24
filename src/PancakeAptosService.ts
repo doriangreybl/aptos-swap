@@ -40,7 +40,7 @@ export async function pancakeAptosSwapTokens(
   const rateTokenFrom = await getRate(tokenFromName);
   const rateTokenTo = await getRate(tokenToName);
 
-  const amountInUsd = +ethers.utils.formatUnits(amountInWei, DECIMALS[tokenFromName]) * Number(rateTokenFrom);
+  const amountInUsd = +(amountInWei *  Number(rateTokenFrom)).toFixed(6) / 10 ** DECIMALS[tokenFromName];
   totalVolume += amountInUsd;
   const amountOut = ethers.utils.parseUnits((amountInUsd / Number(rateTokenTo)).toFixed(6), DECIMALS[tokenToName]);
 
@@ -58,7 +58,7 @@ export async function pancakeAptosSwapTokens(
     ],
     arguments: [
       amountInWei,
-      amountOut.mul(99).div(100).toString(), // min_amount_out
+      amountOut.mul(85).div(100).toString(), // min_amount_out
     ],
     type: 'entry_function_payload',
   };
