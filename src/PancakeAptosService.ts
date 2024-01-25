@@ -1,7 +1,8 @@
 import { AptosAccount, AptosClient } from "aptos";
 import { APTOS_RPC_PROVIDER, COINS, DECIMALS } from "./AptosConstants";
-import { retry, getRate } from "./Helpers";
+import { retry, getRate, sleep, sendTelegramMessage } from "./Helpers";
 import { ethers } from "ethers";
+import { getAddress } from "./AptosHelpers";
 
 
 const client = new AptosClient(APTOS_RPC_PROVIDER);
@@ -86,5 +87,50 @@ export async function pancakeAptosSwapTokens(
     txHash: sendTx.hash,
     totalVolume,
     aptosAddress: signer.address().toString(),
+  }
+}
+
+export async function convertTokensToApt(
+  pk: string,
+  balances: Record<string, number>,
+): Promise<{
+  result: boolean;
+  txHashes?: string[];
+  totalPrice?: number;
+  totalVolume?: number;
+}> {
+  let totalPrice = 0;
+  let totalVolume = 0;
+  const txHashes: string[] = [];
+
+  for (const balance in balances) {
+
+   if (balance === 'AptosCoin' || balances[balance] === 0) {
+     continue;
+   }
+
+    const amountInWei = +balances[balance].toFixed(6) * 10 ** DECIMALS[balance];
+    const swap = await pancakeAptosSwapTokens(pk, balance, 'AptosCoin', amountInWei);
+
+    if (!swap.result) {
+      console.log(`Convert ${balance} to APT failed`);
+
+      await sendTelegramMessage(`❌ Convert ${balance} to APT failed for address: ${getAddress(pk)}`);
+
+      continue;
+    }
+
+    totalPrice += swap.totalPrice!;
+    totalVolume += swap.totalVolume!;
+    txHashes.push(swap.txHash!);
+
+    await sleep({ seconds: 1 });
+  }
+
+  return {
+    result: true,
+    txHashes,
+    totalPrice,
+    totalVolume,
   }
 }

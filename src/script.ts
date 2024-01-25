@@ -1,6 +1,6 @@
 import { DECIMALS, Data } from "./AptosConstants";
 import { shuffleArray, sendTelegramMessage, sleep } from "./Helpers";
-import { pancakeAptosSwapTokens } from "./PancakeAptosService";
+import { pancakeAptosSwapTokens, convertTokensToApt } from "./PancakeAptosService";
 import { getAptosBalance, getAddress } from "./AptosHelpers";
 import { MAX_TRANSACTIONS_PER_WALLET, MIN_APTOS_BALANCE, MIN_WAIT_TIME, MAX_WAIT_TIME, MAX_SWAP_PERCENT, MIN_SWAP_PERCENT, MIN_AMOUNTS } from "../DEPENDENCIES";
 import fs from 'fs';
@@ -33,11 +33,27 @@ async function main() {
     // check if max transactions reached
     if (data[address] && data[address].transactions && data[address].transactions! >= MAX_TRANSACTIONS_PER_WALLET) {
       console.log('Max transactions reached for address: ' + address);
+
+      const convert = await convertTokensToApt(pk, balances);
+
+      if (!convert.result) {
+        console.log('Convert to APT failed for address: ' + address);
+
+        data[address].balances = balances;
+      } else {
+
+        await sendTelegramMessage(
+          `✅ Successfully converted all tokens to APT for address: ${address}, TXs: ${convert.txHashes!.map(tx => `https://tracemove.io/transaction/${tx}`).join(', ')}, total fee: ${(convert.totalPrice)?.toFixed(2)} $`
+        );
+        const balances = await getAptosBalance(pk);
+        data[address].balances = balances;
+        data[address].totalVolume = data[address]?.totalVolume ? data[address].totalVolume! + Number((convert.totalVolume)?.toFixed(2)) : Number((convert.totalVolume)?.toFixed(2));
+        data[address].transactions = data[address]?.transactions ? data[address].transactions! + convert.txHashes!.length : convert.txHashes!.length;
+      }
+
       await sendTelegramMessage(`🗑 Max transactions reached for address: ${address}, removing from list`);
 
       pkArr.splice(pkArr.indexOf(pk), 1);
-
-      data[address].balances = balances;
 
       continue;
     }
@@ -49,10 +65,7 @@ async function main() {
 
       pkArr.splice(pkArr.indexOf(pk), 1);
 
-      data[address] = {
-        address,
-        balances,
-      }
+      data[address].balances = balances;
 
       continue;
     }
@@ -96,10 +109,7 @@ async function main() {
     if (!swap.result) {
       console.log('Swap failed for address: ' + address);
 
-      data[address] = {
-        address,
-        balances,
-      }
+      data[address].balances = balances;
 
       continue;
     }
