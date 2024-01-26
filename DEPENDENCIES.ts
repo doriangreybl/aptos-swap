@@ -1,6 +1,12 @@
 
 
-export const MAX_TRANSACTIONS_PER_WALLET = 25; // transactions per wallet
+export const ACTIONS: Record<string, number> = {
+  swap: 3,
+  lend: 3,
+  stableMint: 3,
+};
+
+export const MAX_TRANSACTIONS_PER_WALLET = ACTIONS.swap + ACTIONS.lend;
 
 export const MIN_APTOS_BALANCE = 0.005; // 0.0025 APTOS balance ~ 0.02 $
 
@@ -9,6 +15,13 @@ export const MIN_AMOUNTS: Record<string, number> = {
   'USDT': 0.5,
   'USDC': 0.5,
   'WETH': 0.0005,
+};
+
+export const LEND_AMOUNTS: Record<string, number> = {
+  'AptosCoin': 0.001,
+  'USDT': 0.01,
+  'USDC': 0.01,
+  'WETH': 0.00001,
 };
 
 export const MIN_WAIT_TIME = 1; // MINUTES

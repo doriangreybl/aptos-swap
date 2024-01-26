@@ -2,8 +2,9 @@ import { DECIMALS, Data } from "./AptosConstants";
 import { shuffleArray, sendTelegramMessage, sleep } from "./Helpers";
 import { pancakeAptosSwapTokens, convertTokensToApt } from "./PancakeAptosService";
 import { getAptosBalance, getAddress } from "./AptosHelpers";
-import { MAX_TRANSACTIONS_PER_WALLET, MIN_APTOS_BALANCE, MIN_WAIT_TIME, MAX_WAIT_TIME, MAX_SWAP_PERCENT, MIN_SWAP_PERCENT, MIN_AMOUNTS } from "../DEPENDENCIES";
+import { MAX_TRANSACTIONS_PER_WALLET, MIN_APTOS_BALANCE, MIN_WAIT_TIME, MAX_WAIT_TIME, MAX_SWAP_PERCENT, MIN_SWAP_PERCENT, MIN_AMOUNTS, ACTIONS } from "../DEPENDENCIES";
 import fs from 'fs';
+import { thalaMintMod, abelLendAsset } from "./Services";
 
 
 let data: Record<string, Data> = {};
@@ -104,7 +105,73 @@ async function main() {
       }
     }
 
-    const swap = await pancakeAptosSwapTokens(pk, tokenFromName, tokenToName, amountToSwap);
+    const possibleActions: string[] = [];
+
+    if (!data[address] || !data[address].swap || data[address].swap! < ACTIONS['swap']) {
+      possibleActions.push('swap');
+    }
+
+    if (!data[address] || !data[address].lend || data[address].lend! < ACTIONS['lend']) {
+      possibleActions.push('lend');
+    }
+
+    if (!data[address] || !data[address].stableMint || data[address].stableMint! < ACTIONS['stableMint']) {
+      possibleActions.push('stableMint');
+    }
+
+    console.log('Possible actions: ' + possibleActions.join(', '));
+    
+    if (possibleActions.length === 0) {
+      console.log('No more actions left for address: ' + address);
+      await sendTelegramMessage(`🛑 No more actions left for address: ${address}, removing from list`);
+
+      pkArr.splice(pkArr.indexOf(pk), 1);
+
+      data[address].balances = balances;
+
+      continue;
+    }
+
+    let swap;
+    const randomAction = shuffleArray(possibleActions)[0];
+    console.log('Random action: ' + randomAction);
+
+    if (randomAction === 'swap') {
+
+      swap = await pancakeAptosSwapTokens(pk, tokenFromName, tokenToName, amountToSwap);
+
+      console.log(`Successfully swapped ${(swap.totalVolume)?.toFixed(2)} $ ${tokenFromName} to ${tokenToName} for address: ${address}, tx: ${swap.txHash} \n`);
+
+      await sendTelegramMessage(
+        `✅ Successfully swapped ${(swap.totalVolume)?.toFixed(2)} $ of ${tokenFromName} to ${tokenToName} for address: ${address}, tx: https://tracemove.io/transaction/${swap.txHash}`
+      );
+
+      data[address].swap = data[address]?.swap ? data[address].swap! + 1 : 1;
+    } else if (randomAction === 'lend') {
+      swap = await abelLendAsset(pk, tokenFromName);
+
+      console.log(`Successfully lent ${tokenFromName} on Abel for address: ${address}, tx: ${swap.txHash} \n`);
+
+      await sendTelegramMessage(
+        `✅ Successfully lent ${tokenFromName} on Abel for address: ${address}, tx: https://tracemove.io/transaction/${swap.txHash}`
+      );
+
+      data[address].lend = data[address]?.lend ? data[address].lend! + 1 : 1;
+    } else  {
+      if(!balancesKeys.includes('USDC') && balances['USDC'] < MIN_AMOUNTS['USDC']) {
+        continue;
+      }
+
+      swap = await thalaMintMod(pk);
+
+      console.log(`Successfully minted MOD using USDC on Thala for address: ${address}, tx: ${swap.txHash} \n`);
+
+      await sendTelegramMessage(
+        `✅ Successfully minted MOD using USDC on Thala for address: ${address}, tx: https://tracemove.io/transaction/${swap.txHash}`
+      );
+
+      data[address].stableMint = data[address]?.stableMint ? data[address].stableMint! + 1 : 1;
+    }
 
     if (!swap.result) {
       console.log('Swap failed for address: ' + address);
@@ -114,18 +181,10 @@ async function main() {
       continue;
     }
 
-    console.log(`Successfully swapped ${(swap.totalVolume)?.toFixed(2)} $ ${tokenFromName} to ${tokenToName} for address: ${address}, tx: ${swap.txHash} \n`);
-
-    await sendTelegramMessage(
-      `✅ Successfully swapped ${(swap.totalVolume)?.toFixed(2)} $ of ${tokenFromName} to ${tokenToName} for address: ${address}, tx: https://tracemove.io/transaction/${swap.txHash}`
-    );
-
-    data[address] = {
-      address,
-      transactions: data[address]?.transactions ? data[address].transactions! + 1 : 1,
-      totalVolume: data[address]?.totalVolume ? data[address].totalVolume! + Number((swap.totalVolume)?.toFixed(2)) : Number((swap.totalVolume)?.toFixed(2)),
-      balances,
-    }
+    data[address].address = address;
+    data[address].transactions =  data[address]?.transactions ? data[address].transactions! + 1 : 1;
+    data[address].totalVolume = data[address]?.totalVolume ? data[address].totalVolume! + Number((swap.totalVolume)?.toFixed(2)) : Number((swap.totalVolume)?.toFixed(2));
+    data[address].balances;
 
     await sleep({ minutes: MIN_WAIT_TIME }, { minutes: MAX_WAIT_TIME });
   }

@@ -19,6 +19,9 @@ export const DECIMALS: Record<string, number> = {
 export type Data = {
   address?: string;
   transactions?: number;
+  swap?: number;
+  lend?: number;
+  stableMint?: number;
   totalVolume?: number;
   balances?: Record<string, number>;
 }
