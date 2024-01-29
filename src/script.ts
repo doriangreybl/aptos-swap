@@ -115,7 +115,7 @@ async function main() {
       possibleActions.push('lend');
     }
 
-    if (!data[address] || !data[address].stableMint || data[address].stableMint! < ACTIONS['stableMint']) {
+    if ((!data[address] || !data[address].stableMint || data[address].stableMint! < ACTIONS['stableMint']) && balancesKeys.includes('USDC') && balances['USDC'] >= MIN_AMOUNTS['USDC']) {
       possibleActions.push('stableMint');
     }
 
@@ -146,7 +146,12 @@ async function main() {
         `✅ Successfully swapped ${(swap.totalVolume)?.toFixed(2)} $ of ${tokenFromName} to ${tokenToName} for address: ${address}, tx: https://tracemove.io/transaction/${swap.txHash}`
       );
 
-      data[address].swap = data[address]?.swap ? data[address].swap! + 1 : 1;
+      //data[address].swap = data[address].swap ? data[address].swap! + 1 : 1;
+
+      data[address] = {
+        ...data[address],
+        swap: data[address]?.swap ? data[address].swap! + 1 : 1,
+      };
     } else if (randomAction === 'lend') {
       swap = await abelLendAsset(pk, tokenFromName);
 
@@ -156,7 +161,12 @@ async function main() {
         `✅ Successfully lent ${tokenFromName} on Abel for address: ${address}, tx: https://tracemove.io/transaction/${swap.txHash}`
       );
 
-      data[address].lend = data[address]?.lend ? data[address].lend! + 1 : 1;
+      //data[address].lend = data[address].lend ? data[address].lend! + 1 : 1;
+
+      data[address] = {
+        ...data[address],
+        lend: data[address]?.lend ? data[address].lend! + 1 : 1,
+      };
     } else  {
       if(!balancesKeys.includes('USDC') && balances['USDC'] < MIN_AMOUNTS['USDC']) {
         continue;
@@ -170,7 +180,11 @@ async function main() {
         `✅ Successfully minted MOD using USDC on Thala for address: ${address}, tx: https://tracemove.io/transaction/${swap.txHash}`
       );
 
-      data[address].stableMint = data[address]?.stableMint ? data[address].stableMint! + 1 : 1;
+      // data[address].stableMint = data[address].stableMint ? data[address].stableMint! + 1 : 1;
+      data[address] = {
+        ...data[address],
+        stableMint: data[address]?.stableMint ? data[address].stableMint! + 1 : 1,
+      };
     }
 
     if (!swap.result) {
@@ -181,10 +195,19 @@ async function main() {
       continue;
     }
 
-    data[address].address = address;
-    data[address].transactions =  data[address]?.transactions ? data[address].transactions! + 1 : 1;
-    data[address].totalVolume = data[address]?.totalVolume ? data[address].totalVolume! + Number((swap.totalVolume)?.toFixed(2)) : Number((swap.totalVolume)?.toFixed(2));
-    data[address].balances;
+    // data[address].address = address;
+    // data[address].transactions =  data[address]?.transactions ? data[address].transactions! + 1 : 1;
+    // data[address].totalVolume = data[address]?.totalVolume ? data[address].totalVolume! + Number((swap.totalVolume)?.toFixed(2)) : Number((swap.totalVolume)?.toFixed(2));
+    // data[address].balances;
+
+    data[address] = {
+      ...data[address],
+      address,
+      transactions: data[address]?.transactions ? data[address].transactions! + 1 : 1,
+      totalVolume: data[address]?.totalVolume ? data[address].totalVolume! + Number((swap.totalVolume)?.toFixed(2)) : Number((swap.totalVolume)?.toFixed(2)),
+      balances,
+    };
+
 
     await sleep({ minutes: MIN_WAIT_TIME }, { minutes: MAX_WAIT_TIME });
   }

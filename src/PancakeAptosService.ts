@@ -109,7 +109,7 @@ export async function convertTokensToApt(
      continue;
    }
 
-    const amountInWei = +balances[balance].toFixed(6) * 10 ** DECIMALS[balance];
+    const amountInWei = Math.floor(+balances[balance].toFixed(6) * 10 ** DECIMALS[balance]);
     const swap = await pancakeAptosSwapTokens(pk, balance, 'AptosCoin', amountInWei);
 
     if (!swap.result) {

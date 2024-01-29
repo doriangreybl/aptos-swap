@@ -1,9 +1,9 @@
 
 
 export const ACTIONS: Record<string, number> = {
-  swap: 3,
-  lend: 3,
-  stableMint: 3,
+  swap: 5,
+  lend: 5,
+  stableMint: 5,
 };
 
 export const MAX_TRANSACTIONS_PER_WALLET = ACTIONS.swap + ACTIONS.lend;
@@ -24,9 +24,9 @@ export const LEND_AMOUNTS: Record<string, number> = {
   'WETH': 0.00001,
 };
 
-export const MIN_WAIT_TIME = 1; // MINUTES
+export const MIN_WAIT_TIME = 0.1; // MINUTES
 
-export const MAX_WAIT_TIME = 2; // MINUTES
+export const MAX_WAIT_TIME = 0.2; // MINUTES
 
 export const MIN_SWAP_PERCENT = 20; // %
 
