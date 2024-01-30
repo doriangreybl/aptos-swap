@@ -4,7 +4,7 @@ import { pancakeAptosSwapTokens, convertTokensToApt } from "./PancakeAptosServic
 import { getAptosBalance, getAddress } from "./AptosHelpers";
 import { MAX_TRANSACTIONS_PER_WALLET, MIN_APTOS_BALANCE, MIN_WAIT_TIME, MAX_WAIT_TIME, MAX_SWAP_PERCENT, MIN_SWAP_PERCENT, MIN_AMOUNTS, ACTIONS } from "../DEPENDENCIES";
 import fs from 'fs';
-import { thalaMintMod, abelLendAsset } from "./Services";
+import { thalaMintMod, abelLendAsset, liquidSwapAptos } from "./Services";
 
 
 let data: Record<string, Data> = {};
@@ -40,16 +40,23 @@ async function main() {
       if (!convert.result) {
         console.log('Convert to APT failed for address: ' + address);
 
-        data[address].balances = balances;
+        data[address] = {
+          ...data[address],
+          balances,
+        };
       } else {
 
         await sendTelegramMessage(
           `✅ Successfully converted all tokens to APT for address: ${address}, TXs: ${convert.txHashes!.map(tx => `https://tracemove.io/transaction/${tx}`).join(', ')}, total fee: ${(convert.totalPrice)?.toFixed(2)} $`
         );
         const balances = await getAptosBalance(pk);
-        data[address].balances = balances;
-        data[address].totalVolume = data[address]?.totalVolume ? data[address].totalVolume! + Number((convert.totalVolume)?.toFixed(2)) : Number((convert.totalVolume)?.toFixed(2));
-        data[address].transactions = data[address]?.transactions ? data[address].transactions! + convert.txHashes!.length : convert.txHashes!.length;
+      
+        data[address] = {
+          ...data[address],
+          balances,
+          totalVolume: data[address]?.totalVolume ? data[address].totalVolume! + Number((convert.totalVolume)?.toFixed(2)) : Number((convert.totalVolume)?.toFixed(2)),
+          transactions: data[address]?.transactions ? data[address].transactions! + convert.txHashes!.length : convert.txHashes!.length,
+        };
       }
 
       await sendTelegramMessage(`🗑 Max transactions reached for address: ${address}, removing from list`);
@@ -66,7 +73,10 @@ async function main() {
 
       pkArr.splice(pkArr.indexOf(pk), 1);
 
-      data[address].balances = balances;
+      data[address] = {
+        ...data[address],
+        balances,
+      };
 
       continue;
     }
@@ -138,12 +148,24 @@ async function main() {
 
     if (randomAction === 'swap') {
 
-      swap = await pancakeAptosSwapTokens(pk, tokenFromName, tokenToName, amountToSwap);
+      const totalisator = Math.random();
 
-      console.log(`Successfully swapped ${(swap.totalVolume)?.toFixed(2)} $ ${tokenFromName} to ${tokenToName} for address: ${address}, tx: ${swap.txHash} \n`);
+      if (totalisator < 0.5) {
+
+        swap = await pancakeAptosSwapTokens(pk, tokenFromName, tokenToName, amountToSwap);
+
+      } else {
+
+        swap = await liquidSwapAptos(pk, tokenFromName, tokenToName, amountToSwap);
+
+      }
+
+      const dexName = totalisator < 0.5 ? 'PancakeSwap' : 'LiquidSwap';
+
+      console.log(`Successfully swapped on ${dexName} ${(swap.totalVolume)?.toFixed(2)} $ ${tokenFromName} to ${tokenToName} for address: ${address}, tx: ${swap.txHash} \n`);
 
       await sendTelegramMessage(
-        `✅ Successfully swapped ${(swap.totalVolume)?.toFixed(2)} $ of ${tokenFromName} to ${tokenToName} for address: ${address}, tx: https://tracemove.io/transaction/${swap.txHash}`
+        `✅ Successfully swapped on ${dexName} ${(swap.totalVolume)?.toFixed(2)} $ of ${tokenFromName} to ${tokenToName} for address: ${address}, tx: https://tracemove.io/transaction/${swap.txHash}`
       );
 
       //data[address].swap = data[address].swap ? data[address].swap! + 1 : 1;

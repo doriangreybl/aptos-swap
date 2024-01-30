@@ -1,7 +1,8 @@
 import { AptosAccount, AptosClient } from "aptos";
 import { APTOS_RPC_PROVIDER, COINS, DECIMALS } from "./AptosConstants";
-import { retry } from "./Helpers";
+import { retry, getRate } from "./Helpers";
 import { LEND_AMOUNTS, MAX_SWAP_PERCENT, MIN_SWAP_PERCENT } from "../DEPENDENCIES";
+import { ethers } from "ethers";
 
 
 const client = new AptosClient(APTOS_RPC_PROVIDER);
@@ -124,5 +125,165 @@ export async function abelLendAsset(
     txHash: sendTx.hash,
     aptosAddress: signer.address().toString(),
     totalVolume: 0,
+  }
+}
+
+export async function liquidSwapAptos(
+  pk: string,
+  tokenFromName: string,
+  tokenToName: string,
+  amountInWei: number,
+): Promise<{
+  result: boolean;
+  name?: string;
+  txHash?: string;
+  totalPrice?: number;
+  totalVolume?: number;
+  aptosAddress?: string;
+}> {
+  let totalVolume = 0;
+  const tokenFrom = COINS[tokenFromName];
+
+  let privateKey = pk;
+  if (privateKey.startsWith('0x')) {
+    privateKey = privateKey.slice(2);
+  }
+  const aptosPrivateKey = Uint8Array.from(Buffer.from(privateKey, 'hex'));
+  const signer = new AptosAccount(aptosPrivateKey);
+
+  const aptBalance = await retry(() => client.getAccountResource(signer.address(), `0x1::coin::CoinStore<${tokenFrom}>`));
+
+  const rateTokenFrom = await getRate(tokenFromName);
+  const rateTokenTo = await getRate(tokenToName);
+
+  const amountInUsd = +(amountInWei *  Number(rateTokenFrom)).toFixed(6) / 10 ** DECIMALS[tokenFromName];
+  totalVolume += amountInUsd;
+  const amountOut = ethers.utils.parseUnits((amountInUsd / Number(rateTokenTo)).toFixed(6), DECIMALS[tokenToName]);
+
+  if (amountInWei > (aptBalance.data as any).coin.value) {
+    return {
+      result: false,
+    }
+  }
+
+  const payload = {
+    "function": "0x190d44266241744264b964a37b8f09863167a12d3e70cda39376cfb4e3561e12::scripts_v2::swap",
+    "type_arguments": [
+      COINS[tokenFromName],
+      COINS[tokenToName],
+      "0x190d44266241744264b964a37b8f09863167a12d3e70cda39376cfb4e3561e12::curves::Uncorrelated"
+    ],
+    "arguments": [
+      amountInWei,
+      amountOut.mul(92).div(100).toString(),
+    ],
+    "type": "entry_function_payload"
+  }
+
+  const nonce = (await retry(() => client.getAccount(signer.address()))).sequence_number;
+  const gasPrice = await retry(() => client.estimateGasPrice());
+
+  const tx = await retry(() => client.generateTransaction(
+    signer.address(),
+    payload,
+    {
+      gas_unit_price: gasPrice.prioritized_gas_estimate!.toString(),
+      max_gas_amount: '1000',
+      sequence_number: nonce.toString(),
+    }
+  ));
+
+  const signedTx = await retry(() => client.signTransaction(signer, tx));
+  const sendTx = await retry(() => client.submitTransaction(signedTx));
+  await retry(() => client.waitForTransaction(sendTx.hash));
+
+  return {
+    result: true,
+    name: `Swap ${tokenFromName} to ${tokenToName} on Aptos Liquidswap`,
+    txHash: sendTx.hash,
+    totalVolume,
+    aptosAddress: signer.address().toString(),
+  }
+}
+
+export async function liquidswapAddLiquidity(
+  pk: string,
+  tokenA: string,
+  tokenB: string,
+): Promise<{
+  result: boolean;
+  name?: string;
+  txHash?: string;
+  aptosAddress?: string;
+}> {
+  let totalVolume = 0;
+
+  let privateKey = pk;
+  if (privateKey.startsWith('0x')) {
+    privateKey = privateKey.slice(2);
+  }
+  const aptosPrivateKey = Uint8Array.from(Buffer.from(privateKey, 'hex'));
+  const signer = new AptosAccount(aptosPrivateKey);
+
+  const tokenBalanceA = await retry(() => client.getAccountResource(signer.address(), `0x1::coin::CoinStore<${COINS[tokenA]}>`));
+  const tokenBalanceB = await retry(() => client.getAccountResource(signer.address(), `0x1::coin::CoinStore<${COINS[tokenB]}>`));
+
+  if ((tokenBalanceA.data as any).coin.value < LEND_AMOUNTS[tokenA] || (tokenBalanceB.data as any).coin.value < LEND_AMOUNTS[tokenB]) {
+    return {
+      result: false,
+    }
+  }
+
+  const rateTokenA = await getRate(tokenA);
+  const rateTokenB = await getRate(tokenB);
+
+  //const percent = Math.floor(Math.random() * (MAX_SWAP_PERCENT - MIN_SWAP_PERCENT + 1) + MIN_SWAP_PERCENT);
+  const amountA = Math.floor(LEND_AMOUNTS[tokenA] * 10 ** DECIMALS[tokenA]);
+  const amountInUsdA = +(amountA / 10 ** DECIMALS[tokenA] * Number(rateTokenA)).toFixed(6);
+  const amountB = Math.floor(amountInUsdA / Number(rateTokenB) * 10 ** DECIMALS[tokenB]);
+
+  console.log('Amount A: ' + amountA);
+  console.log('Amount B: ' + amountB);
+  console.log('Amount in USD: ' + amountInUsdA);
+
+
+  const payload = {
+    "function": "0x190d44266241744264b964a37b8f09863167a12d3e70cda39376cfb4e3561e12::scripts_v2::add_liquidity",
+    "type_arguments": [
+      COINS[tokenA],
+      COINS[tokenB],
+      "0x190d44266241744264b964a37b8f09863167a12d3e70cda39376cfb4e3561e12::curves::Stable"
+    ],
+    "arguments": [
+      amountA,
+      Math.floor(amountA * 0.80),
+      amountB,
+      Math.floor(amountB * 0.80),
+    ],
+    "type": "entry_function_payload"
+  }
+
+  const nonce = (await retry(() => client.getAccount(signer.address()))).sequence_number;
+  const gasPrice = await retry(() => client.estimateGasPrice());
+
+  const tx = await retry(() => client.generateTransaction(
+    signer.address(),
+    payload,
+    {
+      gas_unit_price: gasPrice.prioritized_gas_estimate!.toString(),
+      max_gas_amount: '4000',
+      sequence_number: nonce.toString(),
+    }
+  ));
+
+  const signedTx = await retry(() => client.signTransaction(signer, tx));
+  const sendTx = await retry(() => client.submitTransaction(signedTx));
+  await retry(() => client.waitForTransaction(sendTx.hash));
+
+  return {
+    result: true,
+    name: `Added liquidity ${tokenA} and ${tokenB} on Aptos Liquidswap`,
+    txHash: sendTx.hash,
+    aptosAddress: signer.address().toString(),
   }
 }
