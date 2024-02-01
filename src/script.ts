@@ -68,14 +68,39 @@ async function main() {
 
     // check if balance is too low
     if (balances['AptosCoin'] <  MIN_APTOS_BALANCE) {
-      console.log('AptosCoin balance is too low for address: ' + address);
-      await sendTelegramMessage(`🛑 APT balance is too low for address: ${address}, removing from list, current balance: ${balances['AptosCoin']}`);
 
-      pkArr.splice(pkArr.indexOf(pk), 1);
+
+      console.log('AptosCoin balance is too low for address: ' + address);
+      await sendTelegramMessage(`🛑 APT balance is too low for address: ${address}, converting other tokens to APT`);
+
+      const convert = await convertTokensToApt(pk, balances);
+
+      if (!convert.result) {
+        console.log(`Convert to APT failed for address: ${address}, removing from list`);
+
+        await sendTelegramMessage(`❌ WARNING! Convert to APT failed for address: ${address}, removing from list`);
+
+        data[address] = {
+          ...data[address],
+          balances,
+        };
+
+        pkArr.splice(pkArr.indexOf(pk), 1);
+
+        continue;
+      }
+
+      console.log(`Successfully converted all tokens to APT for address: ${address},  continuing using this address \n`);
+
+      await sendTelegramMessage(
+        `✅ Successfully converted all tokens to APT for address: ${address}, TXs: ${convert.txHashes!.map(tx => `https://tracemove.io/transaction/${tx}`).join(', ')}, total fee: ${(convert.totalPrice)?.toFixed(2)} $, continuing using this address`
+      );
+
 
       data[address] = {
         ...data[address],
-        balances,
+        transactions: data[address]?.transactions ? data[address].transactions! + convert.txHashes!.length : convert.txHashes!.length,
+        totalVolume: data[address]?.totalVolume ? data[address].totalVolume! + Number((convert.totalVolume)?.toFixed(2)) : Number((convert.totalVolume)?.toFixed(2)),
       };
 
       continue;

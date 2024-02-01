@@ -1,9 +1,9 @@
 
 
 export const ACTIONS: Record<string, number> = {
-  swap: 5,
-  lend: 5,
-  stableMint: 5,
+  swap: 8,
+  lend: 8,
+  stableMint: 8,
 };
 
 export const MAX_TRANSACTIONS_PER_WALLET = ACTIONS.swap + ACTIONS.lend;
