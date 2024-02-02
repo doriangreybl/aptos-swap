@@ -1,6 +1,6 @@
 import { AptosAccount, AptosClient } from "aptos";
-import { APTOS_RPC_PROVIDER, COINS, DECIMALS } from "./AptosConstants";
-import { retry, getRate } from "./Helpers";
+import { APTOS_RPC_PROVIDER, COINS, DECIMALS, USELESS_TOKENS } from "./AptosConstants";
+import { retry, getRate, shuffleArray } from "./Helpers";
 import { LEND_AMOUNTS, MAX_SWAP_PERCENT, MIN_SWAP_PERCENT } from "../DEPENDENCIES";
 import { ethers } from "ethers";
 
@@ -216,7 +216,6 @@ export async function liquidswapAddLiquidity(
   txHash?: string;
   aptosAddress?: string;
 }> {
-  let totalVolume = 0;
 
   let privateKey = pk;
   if (privateKey.startsWith('0x')) {
@@ -285,5 +284,81 @@ export async function liquidswapAddLiquidity(
     name: `Added liquidity ${tokenA} and ${tokenB} on Aptos Liquidswap`,
     txHash: sendTx.hash,
     aptosAddress: signer.address().toString(),
+  }
+}
+
+export async function addToken(
+  pk: string
+): Promise<{
+  result: boolean;
+  name?: string;
+  txHash?: string;
+  aptosAddress?: string;
+  totalVolume?: number;
+}> {
+  let totalVolume = 0;
+
+  let privateKey = pk;
+  if (privateKey.startsWith('0x')) {
+    privateKey = privateKey.slice(2);
+  }
+  const aptosPrivateKey = Uint8Array.from(Buffer.from(privateKey, 'hex'));
+  const signer = new AptosAccount(aptosPrivateKey);
+
+  let token = shuffleArray(USELESS_TOKENS)[0];
+  console.log('Token: ' + token);
+
+  let counter = 0;
+  let balanceCheck;
+  while (true) {
+    if (counter > 10) {
+      return {
+        result: false,
+      }
+    }
+    counter++;
+    try {
+      balanceCheck = await client.getAccountResource(signer.address(), `0x1::coin::CoinStore<${token}>`);
+    } catch (e: any) {
+      if (e.message.includes('Resource not found by Address')) {
+        break;
+      }
+    }
+    token = shuffleArray(USELESS_TOKENS)[0];
+    continue;
+  }
+
+  const payload = {
+    "function": "0x1::managed_coin::register",
+    "type_arguments": [
+      token,
+    ],
+    "arguments": [],
+    "type": "entry_function_payload"
+  }
+
+  const nonce = (await retry(() => client.getAccount(signer.address()))).sequence_number;
+  const gasPrice = await retry(() => client.estimateGasPrice());
+
+  const tx = await retry(() => client.generateTransaction(
+    signer.address(),
+    payload,
+    {
+      gas_unit_price: gasPrice.prioritized_gas_estimate!.toString(),
+      max_gas_amount: '500',
+      sequence_number: nonce.toString(),
+    }
+  ));
+
+  const signedTx = await retry(() => client.signTransaction(signer, tx));
+  const sendTx = await retry(() => client.submitTransaction(signedTx));
+  await retry(() => client.waitForTransaction(sendTx.hash));
+
+  return {
+    result: true,
+    name: `Added token ${token.replace(/^\w+::/, '')} to wallet`,
+    txHash: sendTx.hash,
+    aptosAddress: signer.address().toString(),
+    totalVolume,
   }
 }

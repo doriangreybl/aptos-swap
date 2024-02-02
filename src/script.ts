@@ -4,7 +4,7 @@ import { pancakeAptosSwapTokens, convertTokensToApt } from "./PancakeAptosServic
 import { getAptosBalance, getAddress } from "./AptosHelpers";
 import { MAX_TRANSACTIONS_PER_WALLET, MIN_APTOS_BALANCE, MIN_WAIT_TIME, MAX_WAIT_TIME, MAX_SWAP_PERCENT, MIN_SWAP_PERCENT, MIN_AMOUNTS, ACTIONS } from "../DEPENDENCIES";
 import fs from 'fs';
-import { thalaMintMod, abelLendAsset, liquidSwapAptos } from "./Services";
+import { thalaMintMod, abelLendAsset, liquidSwapAptos, addToken } from "./Services";
 
 
 let data: Record<string, Data> = {};
@@ -154,6 +154,10 @@ async function main() {
       possibleActions.push('stableMint');
     }
 
+    if ((!data[address] || !data[address].addCoin || data[address].addCoin! < ACTIONS['addCoin']) && balancesKeys.includes('AptosCoin') && balances['AptosCoin'] >= MIN_AMOUNTS['AptosCoin']) {
+      possibleActions.push('addCoin');
+    }
+
     console.log('Possible actions: ' + possibleActions.join(', '));
     
     if (possibleActions.length === 0) {
@@ -214,7 +218,7 @@ async function main() {
         ...data[address],
         lend: data[address]?.lend ? data[address].lend! + 1 : 1,
       };
-    } else  {
+    } else if (randomAction === 'stableMint')  {
       if(!balancesKeys.includes('USDC') && balances['USDC'] < MIN_AMOUNTS['USDC']) {
         continue;
       }
@@ -231,6 +235,24 @@ async function main() {
       data[address] = {
         ...data[address],
         stableMint: data[address]?.stableMint ? data[address].stableMint! + 1 : 1,
+      };
+    } else {
+      swap = await addToken(pk);
+
+      if (!swap.result) {
+        console.log('Add token failed for address: ' + address);
+        continue;
+      }
+
+      console.log(`${swap.name}: ${address}, tx: ${swap.txHash} \n`);
+
+      await sendTelegramMessage(
+        `✅ ${swap.name}: ${address}, tx: https://tracemove.io/transaction/${swap.txHash}`
+      );
+
+      data[address] = {
+        ...data[address],
+        addCoin: data[address]?.addCoin ? data[address].addCoin! + 1 : 1,
       };
     }
 

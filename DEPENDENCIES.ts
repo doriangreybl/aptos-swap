@@ -4,9 +4,10 @@ export const ACTIONS: Record<string, number> = {
   swap: 8,
   lend: 8,
   stableMint: 8,
+  addCoin: 4,
 };
 
-export const MAX_TRANSACTIONS_PER_WALLET = ACTIONS.swap + ACTIONS.lend;
+export const MAX_TRANSACTIONS_PER_WALLET = ACTIONS.swap + ACTIONS.lend + ACTIONS.addCoin;
 
 export const MIN_APTOS_BALANCE = 0.005; // 0.0025 APTOS balance ~ 0.02 $
 
