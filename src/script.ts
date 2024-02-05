@@ -130,7 +130,7 @@ async function main() {
     } else {
 
       if (balances[tokenFromName] <= MIN_AMOUNTS[tokenFromName]) {
-        amountToSwap = +balances[tokenFromName].toFixed(6) * 10 ** DECIMALS[tokenFromName];
+        amountToSwap = Math.floor(+balances[tokenFromName].toFixed(6) * 10 ** DECIMALS[tokenFromName]);
       } else {
       const balanceInWei = +balances[tokenFromName].toFixed(6) * 10 ** DECIMALS[tokenFromName];
 
